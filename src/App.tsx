@@ -1,34 +1,24 @@
 import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/electron-vite.animate.svg'
+import Home from './Home'
+import Pestañas, { type Tab } from './Pestañas'
 import './App.css'
 
+const tabs: Tab[] = [{ id: 'inicio', label: 'Inicio' }]
+
 function App() {
-  const [count, setCount] = useState(0)
+  const [activeTabId, setActiveTabId] = useState(tabs[0].id)
 
   return (
-    <>
-      <div>
-        <a href="https://electron-vite.github.io" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
+    <main className="app">
+      <Pestañas
+        tabs={tabs}
+        activeTabId={activeTabId}
+        onSelect={setActiveTabId}
+      />
+      <section className="app__content" aria-label="Contenido de la pestaña">
+        {activeTabId === 'inicio' ? <Home /> : null}
+      </section>
+    </main>
   )
 }
 

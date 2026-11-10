@@ -1,1 +1,26 @@
 @import "tailwindcss";
+
+@theme static {
+  --color-very-light: #33373f;
+  --color-light: #272a31;
+  --color-dark: #33373f;
+  --color-very-dark: #33373f;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  min-width: 320px;
+  min-height: 100%;
+  font-family: Arial, sans-serif;
+}
