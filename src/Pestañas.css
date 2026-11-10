@@ -43,3 +43,21 @@
   background: #9298a5;
   content: '';
 }
+
+.tabs__add {
+  width: 36px;
+  flex: 0 0 36px;
+  color: #b6b9c0;
+  font-size: 20px;
+  cursor: pointer;
+}
+
+.tabs__add:hover {
+  color: #fff;
+  background: #3a3e47;
+}
+
+.tabs__add:focus-visible {
+  outline: 2px solid #9298a5;
+  outline-offset: -2px;
+}

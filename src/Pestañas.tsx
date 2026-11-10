@@ -9,9 +9,10 @@ type PestañasProps = {
   tabs: Tab[]
   activeTabId: string
   onSelect: (tabId: string) => void
+  onAdd: () => void
 }
 
-function Pestañas({ tabs, activeTabId, onSelect }: PestañasProps) {
+function Pestañas({ tabs, activeTabId, onSelect, onAdd }: PestañasProps) {
   return (
     <nav className="tabs" aria-label="Pestañas">
       <div className="tabs__list" role="tablist">
@@ -29,6 +30,14 @@ function Pestañas({ tabs, activeTabId, onSelect }: PestañasProps) {
           </button>
         ))}
       </div>
+      <button
+        aria-label="Abrir una nueva pestaña"
+        className="tabs__add"
+        onClick={onAdd}
+        type="button"
+      >
+        +
+      </button>
     </nav>
   )
 }
