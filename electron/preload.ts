@@ -18,7 +18,14 @@ contextBridge.exposeInMainWorld('ipcRenderer', {
     const [channel, ...omit] = args
     return ipcRenderer.invoke(channel, ...omit)
   },
+  async selectFolder(): Promise<string | null> {
+    const folder: unknown = await ipcRenderer.invoke('dialog:select-folder')
+    if (folder === null || typeof folder === 'string') {
+      return folder
+    }
 
+    throw new TypeError('La respuesta del selector de carpetas no es válida.')
+  },
   // You can expose other APTs you need here.
   // ...
 })
