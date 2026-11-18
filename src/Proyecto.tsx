@@ -314,9 +314,7 @@ function Proyecto({ folderPath }: ProyectoProps) {
                               </span>
                             ))}
                           </div>
-                        ) : (
-                          '—'
-                        )}
+                        ) : null}
                       </td>
                       <td className="project-window__commit-sha">
                         <code title={commit.hash}>{commit.hash.slice(0, 7)}</code>
