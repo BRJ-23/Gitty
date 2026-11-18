@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { UserRound } from 'lucide-react'
 import { FitAddon } from 'xterm-addon-fit'
 import { Terminal } from 'xterm'
 import 'xterm/css/xterm.css'
@@ -6,6 +7,26 @@ import './Proyecto.css'
 
 type ProyectoProps = {
   folderPath: string
+}
+
+type CommitGraphNodeProps = {
+  imageSrc?: string
+}
+
+function CommitGraphNode({ imageSrc }: CommitGraphNodeProps) {
+  return (
+    <span className="project-window__commit-graph-node">
+      {imageSrc ? (
+        <img
+          className="project-window__commit-graph-image"
+          src={imageSrc}
+          alt=""
+        />
+      ) : (
+        <UserRound size={13} aria-hidden="true" />
+      )}
+    </span>
+  )
 }
 
 function formatCommitDateTime(value: string): string {
@@ -240,10 +261,18 @@ function Proyecto({ folderPath }: ProyectoProps) {
             <table className="project-window__commit-table">
               <thead>
                 <tr>
-                  <th scope="col">Branch/tag</th>
-                  <th scope="col">SHA</th>
-                  <th scope="col">Gráfico</th>
-                  <th scope="col">Comentario</th>
+                  <th className="project-window__commit-refs" scope="col">
+                    Branch/tag
+                  </th>
+                  <th className="project-window__commit-sha" scope="col">
+                    SHA
+                  </th>
+                  <th className="project-window__commit-graph-heading" scope="col">
+                    Gráfico
+                  </th>
+                  <th className="project-window__commit-comment" scope="col">
+                    Comentario
+                  </th>
                   <th scope="col">Autor</th>
                   <th scope="col">Fecha/hora</th>
                 </tr>
@@ -273,7 +302,7 @@ function Proyecto({ folderPath }: ProyectoProps) {
                 ) : (
                   commits.map((commit) => (
                     <tr className="project-window__commit-row" key={commit.hash}>
-                      <td>
+                      <td className="project-window__commit-refs">
                         {commit.branchTags.length > 0 ? (
                           <div className="project-window__ref-list">
                             {commit.branchTags.map((ref) => (
@@ -289,10 +318,22 @@ function Proyecto({ folderPath }: ProyectoProps) {
                           '—'
                         )}
                       </td>
-                      <td>
+                      <td className="project-window__commit-sha">
                         <code title={commit.hash}>{commit.hash.slice(0, 7)}</code>
                       </td>
-                      <td aria-label="Gráfico pendiente" />
+                      <td
+                        className="project-window__commit-graph"
+                        aria-label={`Gráfico del commit ${commit.hash.slice(0, 7)}`}
+                      >
+                        <span
+                          className="project-window__commit-graph-track"
+                          aria-hidden="true"
+                        >
+                          <span className="project-window__commit-graph-connector" />
+                          <span className="project-window__commit-graph-terminal" />
+                          <CommitGraphNode />
+                        </span>
+                      </td>
                       <td className="project-window__commit-comment">
                         {commit.comment}
                       </td>

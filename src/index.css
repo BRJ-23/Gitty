@@ -5,6 +5,8 @@
   --color-light: #272a31;
   --color-dark: #1c1e23;
   --color-very-dark: #131418;
+  --color-graph: #15a0bf;
+  --color-graph-dark: #1b2b32;
 }
 
 * {
