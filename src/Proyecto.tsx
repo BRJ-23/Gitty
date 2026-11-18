@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { FitAddon } from 'xterm-addon-fit'
 import { Terminal } from 'xterm'
 import 'xterm/css/xterm.css'
@@ -6,6 +6,32 @@ import './Proyecto.css'
 
 type ProyectoProps = {
   folderPath: string
+}
+
+function formatCommitDateTime(value: string): string {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return value
+  }
+
+  const dateText = new Intl.DateTimeFormat(undefined, {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).format(date)
+  const timeParts = new Intl.DateTimeFormat(undefined, {
+    hour: 'numeric',
+    minute: '2-digit',
+  }).formatToParts(date)
+  const timeText = timeParts
+    .map((part) =>
+      part.type === 'hour' && part.value.length === 1
+        ? `\u00a0\u00a0${part.value}`
+        : part.value,
+    )
+    .join('')
+
+  return `${dateText}\u00a0\u00a0${timeText}`
 }
 
 function TerminalPanel({ folderPath }: ProyectoProps) {
@@ -147,6 +173,43 @@ function TerminalPanel({ folderPath }: ProyectoProps) {
 }
 
 function Proyecto({ folderPath }: ProyectoProps) {
+  const [commits, setCommits] = useState<GitCommitInfo[]>([])
+  const [historyError, setHistoryError] = useState<string | null>(null)
+  const [historyLoading, setHistoryLoading] = useState(true)
+
+  useEffect(() => {
+    let active = true
+    setHistoryLoading(true)
+    setHistoryError(null)
+
+    void window.ipcRenderer
+      .getGitHistory(folderPath)
+      .then((history) => {
+        if (active) {
+          setCommits(history)
+        }
+      })
+      .catch((error: unknown) => {
+        console.error('No se pudo cargar el historial Git.', error)
+        if (active) {
+          setHistoryError(
+            error instanceof Error
+              ? error.message
+              : 'No se pudo cargar el historial Git.',
+          )
+        }
+      })
+      .finally(() => {
+        if (active) {
+          setHistoryLoading(false)
+        }
+      })
+
+    return () => {
+      active = false
+    }
+  }, [folderPath])
+
   return (
     <div className="project-window">
       <div className="project-window__toolbar" aria-label="Barra de opciones superior">
@@ -172,8 +235,75 @@ function Proyecto({ folderPath }: ProyectoProps) {
           <div
             className="project-window__center-main"
             role="region"
-            aria-label="Área de trabajo"
-          />
+            aria-label="Historial del proyecto"
+          >
+            <table className="project-window__commit-table">
+              <thead>
+                <tr>
+                  <th scope="col">Branch/tag</th>
+                  <th scope="col">SHA</th>
+                  <th scope="col">Gráfico</th>
+                  <th scope="col">Comentario</th>
+                  <th scope="col">Autor</th>
+                  <th scope="col">Fecha/hora</th>
+                </tr>
+              </thead>
+              <tbody>
+                {historyLoading ? (
+                  <tr>
+                    <td className="project-window__history-message" colSpan={6}>
+                      Cargando historial…
+                    </td>
+                  </tr>
+                ) : historyError ? (
+                  <tr>
+                    <td
+                      className="project-window__history-message project-window__history-message--error"
+                      colSpan={6}
+                    >
+                      {historyError}
+                    </td>
+                  </tr>
+                ) : commits.length === 0 ? (
+                  <tr>
+                    <td className="project-window__history-message" colSpan={6}>
+                      No hay commits para mostrar.
+                    </td>
+                  </tr>
+                ) : (
+                  commits.map((commit) => (
+                    <tr className="project-window__commit-row" key={commit.hash}>
+                      <td>
+                        {commit.branchTags.length > 0 ? (
+                          <div className="project-window__ref-list">
+                            {commit.branchTags.map((ref) => (
+                              <span
+                                className="project-window__ref"
+                                key={ref}
+                              >
+                                {ref}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          '—'
+                        )}
+                      </td>
+                      <td>
+                        <code title={commit.hash}>{commit.hash.slice(0, 7)}</code>
+                      </td>
+                      <td aria-label="Gráfico pendiente" />
+                      <td className="project-window__commit-comment">
+                        {commit.comment}
+                      </td>
+                      <td>{commit.author}</td>
+                      <td>{formatCommitDateTime(commit.date)}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
           <div
             className="project-window__center-bottom"
           >

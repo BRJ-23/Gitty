@@ -26,6 +26,9 @@ contextBridge.exposeInMainWorld('ipcRenderer', {
 
     throw new TypeError('La respuesta del selector de carpetas no es válida.')
   },
+  getGitHistory(repositoryPath: string): Promise<GitCommitInfo[]> {
+    return ipcRenderer.invoke('git:getHistory', repositoryPath)
+  },
   // You can expose other APTs you need here.
   // ...
 })

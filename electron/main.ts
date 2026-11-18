@@ -1,15 +1,95 @@
 import { app, BrowserWindow, dialog, ipcMain, type WebContents } from 'electron'
+import { execFile } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { stat } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
+import { promisify } from 'node:util'
 import { spawn, type IPty } from 'node-pty'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const execFileAsync = promisify(execFile)
 const terminalSessions = new Map<
   string,
   { process: IPty; webContents: WebContents }
 >()
+
+ipcMain.handle(
+  'git:getHistory',
+  async (_event, repositoryPath: unknown): Promise<GitCommitInfo[]> => {
+    if (typeof repositoryPath !== 'string' || repositoryPath.trim().length === 0) {
+      throw new TypeError('La ruta del repositorio no es válida.')
+    }
+
+    const directory = await stat(repositoryPath)
+    if (!directory.isDirectory()) {
+      throw new TypeError('La ruta del repositorio no es una carpeta.')
+    }
+
+    const commandOptions = {
+      cwd: repositoryPath,
+      encoding: 'utf8' as const,
+      maxBuffer: 64 * 1024 * 1024,
+      windowsHide: true,
+    }
+    const [historyResult, refsResult] = await Promise.all([
+      execFileAsync(
+        'git',
+        [
+          'log',
+          '--branches',
+          '--remotes',
+          '-z',
+          '--format=%H%x00%s%x00%an%x00%aI',
+        ],
+        commandOptions,
+      ),
+      execFileAsync(
+        'git',
+        [
+          'for-each-ref',
+          '--format=%(refname:short)%00%(objectname)%00%(*objectname)',
+          'refs/heads',
+          'refs/remotes',
+          'refs/tags',
+        ],
+        commandOptions,
+      ),
+    ])
+
+    const refsByCommit = new Map<string, string[]>()
+    for (const refLine of refsResult.stdout.split(/\r?\n/)) {
+      const [name, objectHash, peeledHash] = refLine.split('\0')
+      const commitHash = peeledHash || objectHash
+      if (!name || !commitHash) {
+        continue
+      }
+
+      const refs = refsByCommit.get(commitHash) ?? []
+      refs.push(name)
+      refsByCommit.set(commitHash, refs)
+    }
+
+    const fields = historyResult.stdout.split('\0')
+    const commits: GitCommitInfo[] = []
+    for (let index = 0; index + 3 < fields.length; index += 4) {
+      const [hash, comment, author, date] = fields.slice(index, index + 4)
+      if (!hash || !date) {
+        continue
+      }
+
+      commits.push({
+        hash,
+        branchTags: refsByCommit.get(hash) ?? [],
+        comment,
+        author,
+        date,
+      })
+    }
+
+    return commits
+  },
+)
 
 function getTerminalDimensions(
   cols: unknown,

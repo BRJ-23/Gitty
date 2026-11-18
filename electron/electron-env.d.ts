@@ -22,9 +22,18 @@ declare namespace NodeJS {
 }
 
 // Used in Renderer process, expose in `preload.ts`
+interface GitCommitInfo {
+  hash: string
+  branchTags: string[]
+  comment: string
+  author: string
+  date: string
+}
+
 interface Window {
   ipcRenderer: import('electron').IpcRenderer & {
     selectFolder: () => Promise<string | null>
+    getGitHistory: (repositoryPath: string) => Promise<GitCommitInfo[]>
   }
   projectTerminal: {
     start: (cwd: string, cols: number, rows: number) => Promise<string>
