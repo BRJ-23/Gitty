@@ -39,7 +39,7 @@
 
 .project-window__panel {
   flex: 0 0 auto;
-  background: #272a31;
+  background: var(--color-light);
 }
 
 .project-window__sidebar {
@@ -48,9 +48,43 @@
 }
 
 .project-window__center {
+  display: flex;
+  min-height: 0;
   min-width: 0;
   flex: 1;
+  flex-direction: column;
   background: #202329;
+}
+
+.project-window__center-main {
+  min-height: 0;
+  flex: 1;
+  background: var(--color-dark);
+}
+
+.project-window__center-bottom {
+  display: flex;
+  min-height: 120px;
+  flex: 0 0 30%;
+  overflow: hidden;
+  border-top: 1px solid #41454d;
+  background: var(--color-very-dark);
+}
+
+.project-window__terminal {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  padding: 8px 12px;
+}
+
+.project-window__terminal .xterm {
+  height: 100%;
+}
+
+.project-window__terminal .xterm-viewport {
+  overflow-y: auto !important;
 }
 
 .project-window__details {

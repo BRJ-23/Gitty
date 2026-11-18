@@ -1,10 +1,137 @@
-import { app, BrowserWindow, dialog, ipcMain } from 'electron'
-import { createRequire } from 'node:module'
+import { app, BrowserWindow, dialog, ipcMain, type WebContents } from 'electron'
+import { randomUUID } from 'node:crypto'
+import { stat } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
+import { spawn, type IPty } from 'node-pty'
 
-const require = createRequire(import.meta.url)
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const terminalSessions = new Map<
+  string,
+  { process: IPty; webContents: WebContents }
+>()
+
+function getTerminalDimensions(
+  cols: unknown,
+  rows: unknown,
+): { cols: number; rows: number } {
+  if (
+    typeof cols !== 'number' ||
+    !Number.isInteger(cols) ||
+    cols < 1 ||
+    cols > 1000 ||
+    typeof rows !== 'number' ||
+    !Number.isInteger(rows) ||
+    rows < 1 ||
+    rows > 1000
+  ) {
+    throw new TypeError('Las dimensiones de la terminal no son válidas.')
+  }
+
+  return { cols, rows }
+}
+
+function getOwnedTerminal(
+  sender: WebContents,
+  terminalId: unknown,
+): { process: IPty; webContents: WebContents } {
+  if (typeof terminalId !== 'string') {
+    throw new TypeError('El identificador de terminal no es válido.')
+  }
+
+  const session = terminalSessions.get(terminalId)
+  if (!session || session.webContents.id !== sender.id) {
+    throw new Error('La terminal solicitada no existe.')
+  }
+
+  return session
+}
+
+function closeTerminalsForWindow(senderId: number): void {
+  for (const [terminalId, session] of terminalSessions) {
+    if (session.webContents.id === senderId) {
+      terminalSessions.delete(terminalId)
+      session.process.kill()
+    }
+  }
+}
+
+ipcMain.handle(
+  'terminal:start',
+  async (event, cwd: unknown, cols: unknown, rows: unknown) => {
+    if (typeof cwd !== 'string' || cwd.length === 0) {
+      throw new TypeError('La carpeta de trabajo no es válida.')
+    }
+    const dimensions = getTerminalDimensions(cols, rows)
+
+    const directory = await stat(cwd)
+    if (!directory.isDirectory()) {
+      throw new TypeError('La carpeta de trabajo no existe.')
+    }
+
+    const id = randomUUID()
+    const shell =
+      process.platform === 'win32'
+        ? process.env.POWERSHELL_EXE || 'powershell.exe'
+        : process.env.SHELL || '/bin/sh'
+    const shellArgs = process.platform === 'win32' ? ['-NoLogo'] : ['-i']
+    const terminalProcess = spawn(shell, shellArgs, {
+      name: 'xterm-256color',
+      ...dimensions,
+      cwd,
+      env: { ...process.env, TERM: 'xterm-256color' },
+    })
+
+    terminalSessions.set(id, { process: terminalProcess, webContents: event.sender })
+    terminalProcess.onData((data) => {
+      if (!event.sender.isDestroyed()) {
+        event.sender.send('terminal:data', id, data)
+      }
+    })
+    terminalProcess.onExit(({ exitCode }) => {
+      terminalSessions.delete(id)
+      if (!event.sender.isDestroyed()) {
+        event.sender.send('terminal:exit', id, exitCode)
+      }
+    })
+
+    return id
+  },
+)
+
+ipcMain.handle('terminal:write', (event, terminalId: unknown, data: unknown) => {
+  if (typeof data !== 'string') {
+    throw new TypeError('Los datos de entrada de la terminal no son válidos.')
+  }
+  getOwnedTerminal(event.sender, terminalId).process.write(data)
+})
+
+ipcMain.handle(
+  'terminal:resize',
+  (event, terminalId: unknown, cols: unknown, rows: unknown) => {
+    const dimensions = getTerminalDimensions(cols, rows)
+    getOwnedTerminal(event.sender, terminalId).process.resize(
+      dimensions.cols,
+      dimensions.rows,
+    )
+  },
+)
+
+ipcMain.handle('terminal:close', (event, terminalId: unknown) => {
+  if (typeof terminalId !== 'string') {
+    throw new TypeError('El identificador de terminal no es válido.')
+  }
+  const session = terminalSessions.get(terminalId)
+  if (!session) {
+    return
+  }
+  if (session.webContents.id !== event.sender.id) {
+    throw new Error('La terminal solicitada no existe.')
+  }
+
+  terminalSessions.delete(terminalId)
+  session.process.kill()
+})
 
 ipcMain.handle('dialog:select-folder', async () => {
   const { canceled, filePaths } = await dialog.showOpenDialog({
@@ -40,6 +167,10 @@ function createWindow() {
     webPreferences: {
       preload: path.join(__dirname, 'preload.mjs'),
     },
+  })
+  const currentWindow = win
+  currentWindow.on('closed', () => {
+    closeTerminalsForWindow(currentWindow.webContents.id)
   })
 
   // Test active push message to Renderer-process.

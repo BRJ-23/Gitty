@@ -1,6 +1,152 @@
+import { useEffect, useRef } from 'react'
+import { FitAddon } from 'xterm-addon-fit'
+import { Terminal } from 'xterm'
+import 'xterm/css/xterm.css'
 import './Proyecto.css'
 
-function Proyecto() {
+type ProyectoProps = {
+  folderPath: string
+}
+
+function TerminalPanel({ folderPath }: ProyectoProps) {
+  const terminalElementRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const terminalElement = terminalElementRef.current
+    if (!terminalElement) {
+      return
+    }
+
+    const styles = getComputedStyle(terminalElement)
+    const fitAddon = new FitAddon()
+    const terminal = new Terminal({
+      cursorBlink: true,
+      fontFamily: 'Consolas, "Courier New", monospace',
+      fontSize: 13,
+      theme: {
+        background:
+          styles.getPropertyValue('--color-very-dark').trim() || '#131418',
+        foreground: styles.color,
+      },
+    })
+    terminal.loadAddon(fitAddon)
+    terminal.open(terminalElement)
+    fitAddon.fit()
+    terminal.focus()
+
+    let terminalId: string | null = null
+    let disposed = false
+    let pendingInput = ''
+    const pendingOutput: Array<{ id: string; data: string }> = []
+
+    const reportError = (action: string, error: unknown) => {
+      console.error(`No se pudo ${action} la terminal.`, error)
+      if (!disposed) {
+        const message =
+          error instanceof Error ? error.message : 'Error desconocido.'
+        terminal.writeln(`\r\n[Error al ${action} la terminal: ${message}]`)
+      }
+    }
+
+    const removeOutputListener = window.projectTerminal.onData((id, data) => {
+      if (id === terminalId) {
+        terminal.write(data)
+      } else if (terminalId === null) {
+        pendingOutput.push({ id, data })
+      }
+    })
+    const removeExitListener = window.projectTerminal.onExit((id, exitCode) => {
+      if (id === terminalId) {
+        terminal.writeln(`\r\n[El proceso terminó con código ${exitCode}.]`)
+        terminalId = null
+        terminal.options.disableStdin = true
+      }
+    })
+    const inputListener = terminal.onData((data) => {
+      if (terminalId) {
+        void window.projectTerminal
+          .write(terminalId, data)
+          .catch((error: unknown) => reportError('escribir en', error))
+      } else {
+        pendingInput += data
+      }
+    })
+    const resizeListener = terminal.onResize(({ cols, rows }) => {
+      if (terminalId) {
+        void window.projectTerminal
+          .resize(terminalId, cols, rows)
+          .catch((error: unknown) => reportError('redimensionar', error))
+      }
+    })
+    const resizeObserver = new ResizeObserver(() => {
+      fitAddon.fit()
+    })
+    resizeObserver.observe(terminalElement)
+
+    void window.projectTerminal
+      .start(folderPath, terminal.cols, terminal.rows)
+      .then((id) => {
+        if (disposed) {
+          void window.projectTerminal
+            .close(id)
+            .catch((error: unknown) => reportError('cerrar', error))
+          return
+        }
+
+        terminalId = id
+        for (const output of pendingOutput) {
+          if (output.id === id) {
+            terminal.write(output.data)
+          }
+        }
+        pendingOutput.length = 0
+
+        if (pendingInput) {
+          const input = pendingInput
+          pendingInput = ''
+          void window.projectTerminal
+            .write(id, input)
+            .catch((error: unknown) => reportError('escribir en', error))
+        }
+
+        void window.projectTerminal
+          .resize(id, terminal.cols, terminal.rows)
+          .catch((error: unknown) => reportError('redimensionar', error))
+      })
+      .catch((error: unknown) => {
+        pendingInput = ''
+        terminal.options.disableStdin = true
+        reportError('iniciar', error)
+      })
+
+    return () => {
+      disposed = true
+      resizeObserver.disconnect()
+      inputListener.dispose()
+      resizeListener.dispose()
+      removeOutputListener()
+      removeExitListener()
+      terminal.dispose()
+
+      if (terminalId) {
+        void window.projectTerminal
+          .close(terminalId)
+          .catch((error: unknown) => reportError('cerrar', error))
+      }
+    }
+  }, [folderPath])
+
+  return (
+    <div
+      ref={terminalElementRef}
+      className="project-window__terminal"
+      role="region"
+      aria-label="Terminal"
+    />
+  )
+}
+
+function Proyecto({ folderPath }: ProyectoProps) {
   return (
     <div className="project-window">
       <div className="project-window__toolbar" aria-label="Barra de opciones superior">
@@ -22,9 +168,18 @@ function Proyecto() {
 
         <div
           className="project-window__center"
-          role="region"
-          aria-label="Área de trabajo"
-        />
+        >
+          <div
+            className="project-window__center-main"
+            role="region"
+            aria-label="Área de trabajo"
+          />
+          <div
+            className="project-window__center-bottom"
+          >
+            <TerminalPanel folderPath={folderPath} />
+          </div>
+        </div>
 
         <aside
           className="project-window__panel project-window__details"

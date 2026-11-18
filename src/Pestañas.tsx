@@ -3,6 +3,7 @@ import './Pestañas.css'
 export type Tab = {
   id: string
   label: string
+  folderPath?: string
 }
 
 type PestañasProps = {

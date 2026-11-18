@@ -26,6 +26,7 @@ function App() {
     const projectTab: Tab = {
       id: `proyecto-${encodeURIComponent(folderPath)}`,
       label: folderName,
+      folderPath,
     }
 
     setTabs((currentTabs) => {
@@ -48,6 +49,8 @@ function App() {
     setActiveTabId(projectTab.id)
   }
 
+  const activeTab = tabs.find((tab) => tab.id === activeTabId)
+
   return (
     <main className="app">
       <Pestañas
@@ -62,7 +65,9 @@ function App() {
           <Plus onFolderSelected={openProjectTab} />
         ) : null}
         {activeTabId !== homeTab.id && activeTabId !== plusTab.id ? (
-          <Proyecto />
+          activeTab?.folderPath ? (
+            <Proyecto folderPath={activeTab.folderPath} />
+          ) : null
         ) : null}
       </section>
     </main>

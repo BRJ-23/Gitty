@@ -3,8 +3,8 @@
 @theme static {
   --color-very-light: #33373f;
   --color-light: #272a31;
-  --color-dark: #33373f;
-  --color-very-dark: #33373f;
+  --color-dark: #1c1e23;
+  --color-very-dark: #131418;
 }
 
 * {
