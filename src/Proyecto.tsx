@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from 'react'
-import { UserRound } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Check, ChevronRight, Laptop, UserRound } from 'lucide-react'
 import { FitAddon } from 'xterm-addon-fit'
 import { Terminal } from 'xterm'
+import githubIcon from './assets/github-light.svg'
 import 'xterm/css/xterm.css'
 import './Proyecto.css'
 
@@ -27,6 +28,138 @@ function CommitGraphNode({ imageSrc }: CommitGraphNodeProps) {
       )}
     </span>
   )
+}
+
+type DisplayCommitRef =
+  | {
+      kind: 'branch'
+      name: string
+      local: boolean
+      selected: boolean
+      remotes: string[]
+    }
+  | { kind: 'tag'; name: string }
+
+function groupCommitRefs(refs: GitReference[]): DisplayCommitRef[] {
+  const groupedRefs: DisplayCommitRef[] = []
+  const branchesByName = new Map<
+    string,
+    Extract<DisplayCommitRef, { kind: 'branch' }>
+  >()
+
+  for (const ref of refs) {
+    if (ref.kind === 'tag') {
+      groupedRefs.push({ kind: 'tag', name: ref.name })
+      continue
+    }
+
+    let branch = branchesByName.get(ref.name)
+    if (!branch) {
+      branch = {
+        kind: 'branch',
+        name: ref.name,
+        local: false,
+        selected: false,
+        remotes: [],
+      }
+      branchesByName.set(ref.name, branch)
+      groupedRefs.push(branch)
+    }
+
+    if (ref.kind === 'local') {
+      branch.local = true
+      branch.selected = ref.selected
+    } else {
+      branch.remotes.push(`${ref.remote}/${ref.name}`)
+    }
+  }
+
+  return groupedRefs
+}
+
+function getBranchColorGroups(commits: GitCommitInfo[]): Map<string, number> {
+  const branchNames = new Set<string>()
+  for (const commit of commits) {
+    for (const ref of commit.branchTags) {
+      if (ref.kind !== 'tag') {
+        branchNames.add(ref.name)
+      }
+    }
+  }
+
+  return new Map(
+    Array.from(branchNames)
+      .sort()
+      .map((name, index): [string, number] => [name, (index % 10) + 1]),
+  )
+}
+
+function getCommitGraphPalettes(
+  commits: GitCommitInfo[],
+  branchColorGroups: Map<string, number>,
+): Map<string, { group: number; selected: boolean }> {
+  const commitsByHash = new Map(commits.map((commit) => [commit.hash, commit]))
+  const branchTips: Array<{
+    name: string
+    hash: string
+    local: boolean
+    selected: boolean
+  }> = []
+
+  for (const commit of commits) {
+    for (const ref of commit.branchTags) {
+      if (ref.kind === 'tag') {
+        continue
+      }
+
+      branchTips.push({
+        name: ref.name,
+        hash: commit.hash,
+        local: ref.kind === 'local',
+        selected: ref.kind === 'local' && ref.selected,
+      })
+    }
+  }
+
+  branchTips.sort(
+    (left, right) =>
+      Number(right.selected) - Number(left.selected) ||
+      Number(right.local) - Number(left.local) ||
+      left.name.localeCompare(right.name) ||
+      left.hash.localeCompare(right.hash),
+  )
+
+  const palettes = new Map<string, { group: number; selected: boolean }>()
+  for (const branch of branchTips) {
+    const group = branchColorGroups.get(branch.name)
+    if (group === undefined) {
+      throw new Error(`No hay una paleta asignada a la rama "${branch.name}".`)
+    }
+
+    const pending = [branch.hash]
+    while (pending.length > 0) {
+      const hash = pending.pop()
+      if (hash === undefined || palettes.has(hash)) {
+        continue
+      }
+
+      const commit = commitsByHash.get(hash)
+      if (!commit) {
+        continue
+      }
+
+      palettes.set(hash, { group, selected: branch.selected })
+      pending.push(...commit.parents)
+    }
+  }
+
+  for (const commit of commits) {
+    if (!palettes.has(commit.hash)) {
+      palettes.set(commit.hash, { group: 1, selected: false })
+    }
+  }
+
+  return palettes
 }
 
 function formatCommitDateTime(value: string): string {
@@ -197,6 +330,40 @@ function Proyecto({ folderPath }: ProyectoProps) {
   const [commits, setCommits] = useState<GitCommitInfo[]>([])
   const [historyError, setHistoryError] = useState<string | null>(null)
   const [historyLoading, setHistoryLoading] = useState(true)
+  const [localBranchesExpanded, setLocalBranchesExpanded] = useState(false)
+  const [remoteBranchesExpanded, setRemoteBranchesExpanded] = useState(false)
+  const { localBranches, remoteBranches } = useMemo(() => {
+    const localBranchesByName = new Map<string, boolean>()
+    const remoteBranchesByName = new Set<string>()
+
+    for (const commit of commits) {
+      for (const ref of commit.branchTags) {
+        if (ref.kind === 'local') {
+          localBranchesByName.set(ref.name, ref.selected)
+        } else if (ref.kind === 'remote') {
+          remoteBranchesByName.add(`${ref.remote}/${ref.name}`)
+        }
+      }
+    }
+
+    return {
+      localBranches: Array.from(
+        localBranchesByName,
+        ([name, selected]) => ({ name, selected }),
+      ).sort((left, right) => left.name.localeCompare(right.name)),
+      remoteBranches: Array.from(remoteBranchesByName).sort((left, right) =>
+        left.localeCompare(right),
+      ),
+    }
+  }, [commits])
+  const branchColorGroups = useMemo(
+    () => getBranchColorGroups(commits),
+    [commits],
+  )
+  const graphColorGroups = useMemo(
+    () => getCommitGraphPalettes(commits, branchColorGroups),
+    [branchColorGroups, commits],
+  )
 
   useEffect(() => {
     let active = true
@@ -248,6 +415,85 @@ function Proyecto({ folderPath }: ProyectoProps) {
           aria-label="Menú de opciones"
         >
           <h2 className="project-window__panel-title">Opciones</h2>
+          <div className="project-window__branch-sections">
+            <section className="project-window__branch-section">
+              <button
+                className="project-window__branch-toggle"
+                type="button"
+                aria-expanded={localBranchesExpanded}
+                aria-controls="project-local-branches"
+                onClick={() => setLocalBranchesExpanded((expanded) => !expanded)}
+              >
+                <ChevronRight
+                  className={`project-window__branch-chevron${localBranchesExpanded ? ' project-window__branch-chevron--expanded' : ''}`}
+                  size={14}
+                  aria-hidden="true"
+                />
+                <span>Local</span>
+              </button>
+              <ul
+                className="project-window__branch-list"
+                id="project-local-branches"
+                hidden={!localBranchesExpanded}
+              >
+                {localBranches.length > 0 ? (
+                  localBranches.map((branch) => (
+                    <li
+                      className="project-window__branch-item"
+                      key={branch.name}
+                    >
+                      <span>{branch.name}</span>
+                      {branch.selected ? (
+                        <Check
+                          size={13}
+                          aria-label="Rama actual"
+                        />
+                      ) : null}
+                    </li>
+                  ))
+                ) : (
+                  <li className="project-window__branch-empty">
+                    No hay ramas locales.
+                  </li>
+                )}
+              </ul>
+            </section>
+            <section className="project-window__branch-section">
+              <button
+                className="project-window__branch-toggle"
+                type="button"
+                aria-expanded={remoteBranchesExpanded}
+                aria-controls="project-remote-branches"
+                onClick={() =>
+                  setRemoteBranchesExpanded((expanded) => !expanded)
+                }
+              >
+                <ChevronRight
+                  className={`project-window__branch-chevron${remoteBranchesExpanded ? ' project-window__branch-chevron--expanded' : ''}`}
+                  size={14}
+                  aria-hidden="true"
+                />
+                <span>Remoto</span>
+              </button>
+              <ul
+                className="project-window__branch-list"
+                id="project-remote-branches"
+                hidden={!remoteBranchesExpanded}
+              >
+                {remoteBranches.length > 0 ? (
+                  remoteBranches.map((branch) => (
+                    <li className="project-window__branch-item" key={branch}>
+                      {branch}
+                    </li>
+                  ))
+                ) : (
+                  <li className="project-window__branch-empty">
+                    No hay ramas remotas.
+                  </li>
+                )}
+              </ul>
+            </section>
+          </div>
         </aside>
 
         <div
@@ -300,19 +546,87 @@ function Proyecto({ folderPath }: ProyectoProps) {
                     </td>
                   </tr>
                 ) : (
-                  commits.map((commit) => (
+                  commits.map((commit) => {
+                    const graphPalette = graphColorGroups.get(commit.hash)
+                    if (!graphPalette) {
+                      throw new Error(
+                        `No hay una paleta asignada al commit "${commit.hash}".`,
+                      )
+                    }
+
+                    return (
                     <tr className="project-window__commit-row" key={commit.hash}>
                       <td className="project-window__commit-refs">
                         {commit.branchTags.length > 0 ? (
                           <div className="project-window__ref-list">
-                            {commit.branchTags.map((ref) => (
-                              <span
-                                className="project-window__ref"
-                                key={ref}
-                              >
-                                {ref}
-                              </span>
-                            ))}
+                            {groupCommitRefs(commit.branchTags).map((ref) => {
+                              const key = `${ref.kind}:${ref.name}`
+                              const colorGroup =
+                                ref.kind === 'branch'
+                                  ? branchColorGroups.get(ref.name)
+                                  : undefined
+                              if (
+                                ref.kind === 'branch' &&
+                                colorGroup === undefined
+                              ) {
+                                throw new Error(
+                                  `No hay una paleta asignada a la rama "${ref.name}".`,
+                                )
+                              }
+                              const title =
+                                ref.kind === 'tag'
+                                  ? ref.name
+                                  : [
+                                      ...ref.remotes,
+                                      ...(ref.local
+                                        ? [`${ref.name}(local)`]
+                                        : []),
+                                    ].join('\n')
+
+                              return (
+                                <span
+                                  className={[
+                                    'project-window__ref',
+                                    colorGroup !== undefined
+                                      ? `project-window__ref--graph-${colorGroup}`
+                                      : '',
+                                    ref.kind === 'branch' && ref.selected
+                                      ? 'project-window__ref--selected'
+                                      : '',
+                                  ]
+                                    .filter(Boolean)
+                                    .join(' ')}
+                                  key={key}
+                                  title={title}
+                                >
+                                  {ref.kind === 'branch' && ref.selected ? (
+                                    <Check
+                                      className="project-window__ref-selected"
+                                      size={12}
+                                      aria-hidden="true"
+                                    />
+                                  ) : null}
+                                  <span className="project-window__ref-name">
+                                    {ref.name}
+                                  </span>
+                                  {ref.kind === 'branch' ? (
+                                    <span className="project-window__ref-icons">
+                                      {ref.local ? (
+                                        <Laptop size={12} aria-hidden="true" />
+                                      ) : null}
+                                      {ref.remotes.length > 0 ? (
+                                        <img
+                                          className="project-window__ref-icon"
+                                          src={githubIcon}
+                                          alt=""
+                                          aria-hidden="true"
+                                        />
+                                      ) : null}
+                                    </span>
+                                  ) : null}
+                                </span>
+                              )
+                            })}
                           </div>
                         ) : null}
                       </td>
@@ -320,7 +634,15 @@ function Proyecto({ folderPath }: ProyectoProps) {
                         <code title={commit.hash}>{commit.hash.slice(0, 7)}</code>
                       </td>
                       <td
-                        className="project-window__commit-graph"
+                        className={[
+                          'project-window__commit-graph',
+                          `project-window__commit-graph--group-${graphPalette.group}`,
+                          graphPalette.selected
+                            ? 'project-window__commit-graph--selected'
+                            : '',
+                        ]
+                          .filter(Boolean)
+                          .join(' ')}
                         aria-label={`Gráfico del commit ${commit.hash.slice(0, 7)}`}
                       >
                         <span
@@ -338,7 +660,8 @@ function Proyecto({ folderPath }: ProyectoProps) {
                       <td>{commit.author}</td>
                       <td>{formatCommitDateTime(commit.date)}</td>
                     </tr>
-                  ))
+                    )
+                  })
                 )}
               </tbody>
             </table>

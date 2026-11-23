@@ -47,6 +47,62 @@
   border-right: 1px solid #41454d;
 }
 
+.project-window__branch-sections {
+  padding: 8px 0;
+}
+
+.project-window__branch-toggle {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 14px;
+  border: 0;
+  background: transparent;
+  color: #d4d7de;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+}
+
+.project-window__branch-toggle:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.project-window__branch-chevron {
+  flex: 0 0 auto;
+  transition: transform 120ms ease;
+}
+
+.project-window__branch-chevron--expanded {
+  transform: rotate(90deg);
+}
+
+.project-window__branch-list {
+  margin: 0;
+  padding: 2px 0 6px;
+  list-style: none;
+}
+
+.project-window__branch-item {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 14px 6px 35px;
+  color: #c1c4cb;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.project-window__branch-empty {
+  padding: 6px 14px 6px 35px;
+  color: #8f949e;
+  font-size: 11px;
+}
+
 .project-window__center {
   display: flex;
   min-height: 0;
@@ -116,9 +172,76 @@
   width: 400px;
 }
 
+.project-window__commit-graph--group-1 {
+  --project-window-graph-light: var(--color-graph-1-light);
+  --project-window-graph-normal: var(--color-graph-1);
+  --project-window-graph-dark: var(--color-graph-1-dark);
+}
+
+.project-window__commit-graph--group-2 {
+  --project-window-graph-light: var(--color-graph-2-light);
+  --project-window-graph-normal: var(--color-graph-2);
+  --project-window-graph-dark: var(--color-graph-2-dark);
+}
+
+.project-window__commit-graph--group-3 {
+  --project-window-graph-light: var(--color-graph-3-light);
+  --project-window-graph-normal: var(--color-graph-3);
+  --project-window-graph-dark: var(--color-graph-3-dark);
+}
+
+.project-window__commit-graph--group-4 {
+  --project-window-graph-light: var(--color-graph-4-light);
+  --project-window-graph-normal: var(--color-graph-4);
+  --project-window-graph-dark: var(--color-graph-4-dark);
+}
+
+.project-window__commit-graph--group-5 {
+  --project-window-graph-light: var(--color-graph-5-light);
+  --project-window-graph-normal: var(--color-graph-5);
+  --project-window-graph-dark: var(--color-graph-5-dark);
+}
+
+.project-window__commit-graph--group-6 {
+  --project-window-graph-light: var(--color-graph-6-light);
+  --project-window-graph-normal: var(--color-graph-6);
+  --project-window-graph-dark: var(--color-graph-6-dark);
+}
+
+.project-window__commit-graph--group-7 {
+  --project-window-graph-light: var(--color-graph-7-light);
+  --project-window-graph-normal: var(--color-graph-7);
+  --project-window-graph-dark: var(--color-graph-7-dark);
+}
+
+.project-window__commit-graph--group-8 {
+  --project-window-graph-light: var(--color-graph-8-light);
+  --project-window-graph-normal: var(--color-graph-8);
+  --project-window-graph-dark: var(--color-graph-8-dark);
+}
+
+.project-window__commit-graph--group-9 {
+  --project-window-graph-light: var(--color-graph-9-light);
+  --project-window-graph-normal: var(--color-graph-9);
+  --project-window-graph-dark: var(--color-graph-9-dark);
+}
+
+.project-window__commit-graph--group-10 {
+  --project-window-graph-light: var(--color-graph-10-light);
+  --project-window-graph-normal: var(--color-graph-10);
+  --project-window-graph-dark: var(--color-graph-10-dark);
+}
+
+.project-window__commit-graph--selected {
+  --project-window-graph-light: var(--project-window-graph-normal);
+}
+
 .project-window__commit-graph {
   padding: 0 10px !important;
-  background-image: linear-gradient(var(--color-graph), var(--color-graph));
+  background-image: linear-gradient(
+    var(--project-window-graph-light),
+    var(--project-window-graph-light)
+  );
   background-position: center;
   background-repeat: no-repeat;
   background-size: 2px 100%;
@@ -152,7 +275,7 @@
   right: 0;
   bottom: 0;
   left: 50%;
-  background: var(--color-graph-dark);
+  background: var(--project-window-graph-dark);
 }
 
 .project-window__commit-graph-terminal {
@@ -162,7 +285,7 @@
   right: 0;
   width: 2px;
   height: 24px;
-  background: var(--color-graph);
+  background: var(--project-window-graph-light);
 }
 
 .project-window__commit-graph-node {
@@ -175,10 +298,10 @@
   height: 24px;
   align-items: center;
   justify-content: center;
-  border: 2px solid var(--color-graph);
+  border: 2px solid var(--project-window-graph-light);
   border-radius: 50%;
   background: var(--color-dark);
-  color: var(--color-graph);
+  color: var(--project-window-graph-light);
   transform: translate(-50%, -50%);
 }
 
@@ -204,12 +327,110 @@
 }
 
 .project-window__ref {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   padding: 2px 5px;
   border: 1px solid #525866;
   border-radius: 3px;
   color: #c8d6f0;
   font-size: 10px;
   white-space: nowrap;
+}
+
+.project-window__ref--graph-1 {
+  background-color: var(--color-graph-1-dark);
+}
+
+.project-window__ref--graph-1.project-window__ref--selected {
+  background-color: var(--color-graph-1);
+}
+
+.project-window__ref--graph-2 {
+  background-color: var(--color-graph-2-dark);
+}
+
+.project-window__ref--graph-2.project-window__ref--selected {
+  background-color: var(--color-graph-2);
+}
+
+.project-window__ref--graph-3 {
+  background-color: var(--color-graph-3-dark);
+}
+
+.project-window__ref--graph-3.project-window__ref--selected {
+  background-color: var(--color-graph-3);
+}
+
+.project-window__ref--graph-4 {
+  background-color: var(--color-graph-4-dark);
+}
+
+.project-window__ref--graph-4.project-window__ref--selected {
+  background-color: var(--color-graph-4);
+}
+
+.project-window__ref--graph-5 {
+  background-color: var(--color-graph-5-dark);
+}
+
+.project-window__ref--graph-5.project-window__ref--selected {
+  background-color: var(--color-graph-5);
+}
+
+.project-window__ref--graph-6 {
+  background-color: var(--color-graph-6-dark);
+}
+
+.project-window__ref--graph-6.project-window__ref--selected {
+  background-color: var(--color-graph-6);
+}
+
+.project-window__ref--graph-7 {
+  background-color: var(--color-graph-7-dark);
+}
+
+.project-window__ref--graph-7.project-window__ref--selected {
+  background-color: var(--color-graph-7);
+}
+
+.project-window__ref--graph-8 {
+  background-color: var(--color-graph-8-dark);
+}
+
+.project-window__ref--graph-8.project-window__ref--selected {
+  background-color: var(--color-graph-8);
+}
+
+.project-window__ref--graph-9 {
+  background-color: var(--color-graph-9-dark);
+}
+
+.project-window__ref--graph-9.project-window__ref--selected {
+  background-color: var(--color-graph-9);
+}
+
+.project-window__ref--graph-10 {
+  background-color: var(--color-graph-10-dark);
+}
+
+.project-window__ref--graph-10.project-window__ref--selected {
+  background-color: var(--color-graph-10);
+}
+
+.project-window__ref-icons {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.project-window__ref-selected {
+  color: #fff;
+}
+
+.project-window__ref-icon {
+  width: 12px;
+  height: 12px;
 }
 
 .project-window__history-message {

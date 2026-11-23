@@ -24,11 +24,17 @@ declare namespace NodeJS {
 // Used in Renderer process, expose in `preload.ts`
 interface GitCommitInfo {
   hash: string
-  branchTags: string[]
+  parents: string[]
+  branchTags: GitReference[]
   comment: string
   author: string
   date: string
 }
+
+type GitReference =
+  | { name: string; kind: 'local'; selected: boolean }
+  | { name: string; kind: 'tag' }
+  | { name: string; kind: 'remote'; remote: string }
 
 interface Window {
   ipcRenderer: import('electron').IpcRenderer & {

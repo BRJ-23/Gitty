@@ -40,7 +40,7 @@ ipcMain.handle(
           '--branches',
           '--remotes',
           '-z',
-          '--format=%H%x00%s%x00%an%x00%aI',
+          '--format=%H%x00%P%x00%s%x00%an%x00%aI',
         ],
         commandOptions,
       ),
@@ -48,7 +48,7 @@ ipcMain.handle(
         'git',
         [
           'for-each-ref',
-          '--format=%(refname:short)%00%(objectname)%00%(*objectname)',
+          '--format=%(refname)%00%(objectname)%00%(*objectname)%00%(HEAD)%00%(symref)',
           'refs/heads',
           'refs/remotes',
           'refs/tags',
@@ -57,29 +57,61 @@ ipcMain.handle(
       ),
     ])
 
-    const refsByCommit = new Map<string, string[]>()
+    const refsByCommit = new Map<string, GitReference[]>()
     for (const refLine of refsResult.stdout.split(/\r?\n/)) {
-      const [name, objectHash, peeledHash] = refLine.split('\0')
+      const [fullName, objectHash, peeledHash, headMarker, symbolicRef] =
+        refLine.split('\0')
       const commitHash = peeledHash || objectHash
-      if (!name || !commitHash) {
+      if (!fullName || !commitHash || symbolicRef) {
+        continue
+      }
+
+      let ref: GitReference
+      if (fullName.startsWith('refs/heads/')) {
+        ref = {
+          name: fullName.slice('refs/heads/'.length),
+          kind: 'local',
+          selected: headMarker === '*',
+        }
+      } else if (fullName.startsWith('refs/remotes/')) {
+        const remoteRef = fullName.slice('refs/remotes/'.length)
+        const separatorIndex = remoteRef.indexOf('/')
+        if (separatorIndex < 1) {
+          continue
+        }
+        ref = {
+          name: remoteRef.slice(separatorIndex + 1),
+          kind: 'remote',
+          remote: remoteRef.slice(0, separatorIndex),
+        }
+      } else if (fullName.startsWith('refs/tags/')) {
+        ref = {
+          name: fullName.slice('refs/tags/'.length),
+          kind: 'tag',
+        }
+      } else {
         continue
       }
 
       const refs = refsByCommit.get(commitHash) ?? []
-      refs.push(name)
+      refs.push(ref)
       refsByCommit.set(commitHash, refs)
     }
 
     const fields = historyResult.stdout.split('\0')
     const commits: GitCommitInfo[] = []
-    for (let index = 0; index + 3 < fields.length; index += 4) {
-      const [hash, comment, author, date] = fields.slice(index, index + 4)
+    for (let index = 0; index + 4 < fields.length; index += 5) {
+      const [hash, parentHashes, comment, author, date] = fields.slice(
+        index,
+        index + 5,
+      )
       if (!hash || !date) {
         continue
       }
 
       commits.push({
         hash,
+        parents: parentHashes ? parentHashes.split(' ') : [],
         branchTags: refsByCommit.get(hash) ?? [],
         comment,
         author,
